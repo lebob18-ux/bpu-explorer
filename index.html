@@ -56,10 +56,6 @@ button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:11px 15px
     <div class="field"><label for="mode">Chercher dans</label><select id="mode"><option value="all">Code + désignation + descriptif</option><option value="code">Code BPU uniquement</option><option value="title">Désignation uniquement</option><option value="detail">Descriptif uniquement</option></select></div>
     <div class="field"><label for="unit">Unité</label><select id="unit"><option value="">Toutes les unités</option></select></div>
     <div class="field"><label for="operation">Type d’opération</label><select id="operation"><option value="all">Pose et dépose</option><option value="pose">Pose uniquement</option><option value="depose">Dépose uniquement</option></select></div>
-    <div class="field"><label for="sort">Trier les résultats</label><select id="sort"><option value="relevance">Pertinence</option><option value="code">Code BPU</option><option value="title">Désignation A → Z</option></select></div>
-  </div>
-  <div class="chips">
-    <button class="chip" data-q="dépose">Dépose</button><button class="chip" data-q="support">Support</button><button class="chip" data-q="massif">Massif</button><button class="chip" data-q="fouille">Fouille</button><button class="chip" data-q="béton">Béton</button><button class="chip" data-q="blindage">Blindage</button>
   </div>
   <div class="hint">La recherche par code accepte une référence complète ou une partie du code. Les prix ne sont pas affichés.</div>
 </section>
@@ -105,8 +101,13 @@ function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&l
 function score(rec,q,mode){
  const n=norm(q); if(!n)return 1;
  const code=norm(rec.code), title=norm(rec.designation), detail=norm(rec.sous);
+ const compact = s => norm(s).replace(/[^a-z0-9]/g, "");
+ const compactCode = compact(rec.code), compactQuery = compact(q);
  const hay=mode==="code"?code:mode==="title"?title:mode==="detail"?detail:code+" "+title+" "+detail;
  let sc=0;
+ // Recherche de code tolérante aux espaces et séparateurs : « 4 P 015 » = « 4P 015 ».
+ if(mode==="code" && compactQuery && compactCode.includes(compactQuery)) sc+=150;
+ if(mode!=="code" && compactQuery && compactCode.includes(compactQuery)) sc+=35;
  if(hay.includes(n))sc+= mode==="code"?100: mode==="title"?80: mode==="detail"?60:50;
  const words=tokens(q);
  for(const w of words){
@@ -126,8 +127,7 @@ function populateUnits(){
 function getFiltered(){
  const q=$("q").value.trim(), mode=$("mode").value, unit=$("unit").value, operation=$("operation").value;
  let rows=DATA.map((r,i)=>({...r,_i:i,_score:score(r,q,mode)})).filter(r=>(!q||r._score>0)&&(!unit||r.unite===unit)&&operationMatch(r,operation));
- const sort=$("sort").value;
- rows.sort((a,b)=>sort==="code"?a.code.localeCompare(b.code,"fr"):sort==="title"?a.designation.localeCompare(b.designation,"fr"):b._score-a._score||a.code.localeCompare(b.code,"fr"));
+ rows.sort((a,b)=>b._score-a._score||a.code.localeCompare(b.code,"fr"));
  return rows;
 }
 function render(){
@@ -171,8 +171,8 @@ function exportCSV(){
  const csv=["Code BPU;Désignation;Unité;Descriptif",...rows.map(r=>[r.code,r.designation,r.unite,r.sous].map(quote).join(";"))].join("\\r\\n");
  const blob=new Blob(["\\ufeff"+csv],{type:"text/csv;charset=utf-8;"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="resultats_BPU.csv";a.click();URL.revokeObjectURL(url);
 }
-$("q").addEventListener("input",render);$("mode").addEventListener("change",render);$("unit").addEventListener("change",render);$("operation").addEventListener("change",render);$("sort").addEventListener("change",render);
-$("clear").onclick=()=>{$("q").value="";$("mode").value="all";$("unit").value="";$("operation").value="all";$("sort").value="relevance";render();$("q").focus()};
+$("q").addEventListener("input",render);$("mode").addEventListener("change",render);$("unit").addEventListener("change",render);$("operation").addEventListener("change",render);
+$("clear").onclick=()=>{$("q").value="";$("mode").value="all";$("unit").value="";$("operation").value="all";render();$("q").focus()};
 document.querySelectorAll("[data-q]").forEach(b=>b.onclick=()=>{$("q").value=b.dataset.q;$("mode").value="all";render();$("q").focus()});
 $("export").onclick=exportCSV;$("close").onclick=closeModal;$("modalback").addEventListener("click",e=>{if(e.target===$("modalback"))closeModal()});document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal()});
 populateUnits();render();
