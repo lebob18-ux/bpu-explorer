@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#7C2270">
-<title>BPU Explorer — Recherche de prestations</title>
+<title>BPU AINM V2</title>
 <style>
 :root{--violet:#7c2270;--violet2:#f4eaf3;--ink:#20202a;--muted:#686875;--line:#e6e3e8;--bg:#f7f6f8;--green:#087f5b;--amber:#9a6700}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
@@ -103,21 +103,26 @@ function score(rec,q,mode){
  const code=norm(rec.code), title=norm(rec.designation), detail=norm(rec.sous);
  const compact = s => norm(s).replace(/[^a-z0-9]/g, "");
  const compactCode = compact(rec.code), compactQuery = compact(q);
+ const useCode = mode==="all"||mode==="code";
+ const useTitle = mode==="all"||mode==="title";
+ const useDetail = mode==="all"||mode==="detail";
  const hay=mode==="code"?code:mode==="title"?title:mode==="detail"?detail:code+" "+title+" "+detail;
+ const codeCompactHit = useCode && compactQuery && compactCode.includes(compactQuery);
  let sc=0;
- // Recherche de code tolérante aux espaces et séparateurs : « 4 P 015 » = « 4P 015 ».
- if(mode==="code" && compactQuery && compactCode.includes(compactQuery)) sc+=150;
- if(mode!=="code" && compactQuery && compactCode.includes(compactQuery)) sc+=35;
+ if(codeCompactHit) sc+= mode==="code"?150:35;
  if(hay.includes(n))sc+= mode==="code"?100: mode==="title"?80: mode==="detail"?60:50;
  const words=tokens(q);
+ let allHit=words.length>0;
  for(const w of words){
-  const codeHit=hasWordOrNear(code,w) || code.split(" ").some(x=>x.includes(w));
-  const titleHit=hasWordOrNear(title,w) || title.includes(w);
-  const detailHit=hasWordOrNear(detail,w) || detail.includes(w);
+  const codeHit=useCode && code.split(" ").some(x=>x.includes(w));
+  const titleHit=useTitle && (hasWordOrNear(title,w) || (w.length>=4 && title.includes(w)));
+  const detailHit=useDetail && (hasWordOrNear(detail,w) || (w.length>=4 && detail.includes(w)));
   if(codeHit)sc+= mode==="code"?25:8;
   if(titleHit)sc+= mode==="title"?18:12;
   if(detailHit)sc+= mode==="detail"?12:4;
+  if(!(codeHit||titleHit||detailHit)) allHit=false;
  }
+ if(!allHit && !codeCompactHit && !hay.includes(n)) return 0;
  return sc;
 }
 function populateUnits(){
